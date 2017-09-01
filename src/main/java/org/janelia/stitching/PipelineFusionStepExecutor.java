@@ -200,7 +200,7 @@ public class PipelineFusionStepExecutor< T extends NativeType< T > & RealType< T
 		// get cell grid coordinates to know the offset
 		final List< long[] > gridCoords = sparkContext.parallelize( biggerCells, Math.min( biggerCells.size(), MAX_PARTITIONS ) ).map( biggerCell ->
 		{
-			final Boundaries biggerCellBox = biggerCell.getBoundaries();
+			final Interval biggerCellBox = TileOperations.estimateBoundingBox( biggerCell );
 
 			final long[] biggerCellOffsetCoordinates = new long[ biggerCellBox.numDimensions() ];
 			for ( int d = 0; d < biggerCellOffsetCoordinates.length; d++ )
@@ -225,7 +225,7 @@ public class PipelineFusionStepExecutor< T extends NativeType< T > & RealType< T
 
 		sparkContext.parallelize( biggerCells, Math.min( biggerCells.size(), MAX_PARTITIONS ) ).foreach( biggerCell ->
 			{
-				final Boundaries biggerCellBox = biggerCell.getBoundaries();
+				final Interval biggerCellBox = TileOperations.estimateBoundingBox( biggerCell );
 				final Set< Integer > tileIndexesWithinCell = TileOperations.findTilesWithinSubregion( transformedTilesBoundingBoxes, biggerCellBox );
 				if ( tileIndexesWithinCell.isEmpty() )
 					return;

@@ -9,12 +9,13 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.janelia.stitching.Boundaries;
 import org.janelia.stitching.SerializablePairWiseStitchingResult;
 import org.janelia.stitching.TileInfoJSONProvider;
 import org.janelia.stitching.TileOperations;
 import org.janelia.stitching.TilePair;
 import org.janelia.stitching.Utils;
+
+import net.imglib2.Interval;
 
 /**
  * @author Igor Pisarev
@@ -103,7 +104,7 @@ public class FilterAdjacentShifts
 			validShifts++;
 			shift.setIsValidOverlap( false );
 
-			final Boundaries overlap = TileOperations.getOverlappingRegionGlobal( shift.getTilePair().getA(), shift.getTilePair().getB() );
+			final Interval overlap = TileOperations.getOverlappingRegionGlobal( shift.getTilePair().getA(), shift.getTilePair().getB() );
 
 			final boolean[] shortEdges = new boolean[overlap.numDimensions() ];
 			for ( int d = 0; d < overlap.numDimensions(); d++ )
@@ -185,7 +186,7 @@ public class FilterAdjacentShifts
 		final List< TilePair > adjacentPairs = new ArrayList<>();
 		for ( final TilePair pair : overlappingPairs )
 		{
-			final Boundaries overlap = TileOperations.getOverlappingRegionGlobal( pair.getA(), pair.getB() );
+			final Interval overlap = TileOperations.getOverlappingRegionGlobal( pair.getA(), pair.getB() );
 
 			final List< Integer > shortEdgeDims = new ArrayList<>();
 			for ( int d = 0; d < overlap.numDimensions(); d++ )

@@ -1028,7 +1028,7 @@ public class SearchRadiusEstimatorTest
 
 
 				final int[] displaySize = new int[] { 1500, 1500 };
-				final int[] displayOffset = Intervals.minAsIntArray( fixedTile.getBoundaries() );
+				final int[] displayOffset = Intervals.minAsIntArray( TileOperations.estimateBoundingBox( fixedTile ) );
 				displayOffset[ 0 ] -= displaySize[ 0 ] / 2;
 				displayOffset[ 1 ] -= displaySize[ 1 ] / 2;
 				final IntImagePlus< ARGBType > img = ImagePlusImgs.argbs( Conversions.toLongArray( displaySize ) );
@@ -1038,7 +1038,7 @@ public class SearchRadiusEstimatorTest
 				// Draw fixed tile contour
 				{
 					final int fixedTileContourColor = ARGBType.rgba( 0x22, 0x22, 0, 0xff );
-					final int[][] fixedTileContourCorners = new int[][] { Intervals.minAsIntArray( fixedTile.getBoundaries() ), Intervals.maxAsIntArray( fixedTile.getBoundaries() ) };
+					final int[][] fixedTileContourCorners = new int[][] { Intervals.minAsIntArray( TileOperations.estimateBoundingBox( fixedTile ) ), Intervals.maxAsIntArray( TileOperations.estimateBoundingBox( fixedTile ) ) };
 					for ( int dFixed = 0; dFixed < 2; ++dFixed )
 					{
 						for ( int dMove = 0; dMove < 2; ++dMove )
@@ -1066,7 +1066,7 @@ public class SearchRadiusEstimatorTest
 				// Draw moving tile contour
 				{
 					final int movingTileContourColor = ARGBType.rgba( 0, 0x22, 0x22, 0xff );
-					final int[][] movingTileContourCorners = new int[][] { Intervals.minAsIntArray( movingTile.getBoundaries() ), Intervals.maxAsIntArray( movingTile.getBoundaries() ) };
+					final int[][] movingTileContourCorners = new int[][] { Intervals.minAsIntArray( TileOperations.estimateBoundingBox( movingTile ) ), Intervals.maxAsIntArray( TileOperations.estimateBoundingBox( movingTile ) ) };
 					for ( int dFixed = 0; dFixed < 2; ++dFixed )
 					{
 						for ( int dMove = 0; dMove < 2; ++dMove )
@@ -1095,7 +1095,7 @@ public class SearchRadiusEstimatorTest
 				{
 					final int fixedTileColor = ARGBType.rgba( 0xff, 0xff, 0, 0xff );
 					for ( int d = 0; d < 2; ++d )
-						displayPosition[ d ] = ( int ) fixedTile.getBoundaries().min( d ) - displayOffset[ d ];
+						displayPosition[ d ] = ( int ) TileOperations.estimateBoundingBox( fixedTile ).min( d ) - displayOffset[ d ];
 					if ( displayPosition[ 0 ] > 0 && displayPosition[ 0 ] < displaySize[ 0 ] - 1 && displayPosition[ 1 ] > 0 && displayPosition[ 1 ] < displaySize[ 1 ] - 1 )
 					{
 						imgRandomAccess.setPosition( displayPosition );
@@ -1150,7 +1150,7 @@ public class SearchRadiusEstimatorTest
 				{
 					final int movingTileColor = ARGBType.rgba( 0, 0xff, 0xff, 0xff );
 					for ( int d = 0; d < 2; ++d )
-						displayPosition[ d ] = ( int ) movingTile.getBoundaries().min( d ) - displayOffset[ d ];
+						displayPosition[ d ] = ( int ) TileOperations.estimateBoundingBox( movingTile ).min( d ) - displayOffset[ d ];
 					if ( displayPosition[ 0 ] > 0 && displayPosition[ 0 ] < displaySize[ 0 ] - 1 && displayPosition[ 1 ] > 0 && displayPosition[ 1 ] < displaySize[ 1 ] - 1 )
 					{
 						imgRandomAccess.setPosition( displayPosition );
@@ -1343,7 +1343,7 @@ public class SearchRadiusEstimatorTest
 				// Draw adjusted overlap contour for the fixed tile
 				{
 					final int fixedTileContourColor = ARGBType.rgba( 0x88, 0x88, 0, 0xff );
-					final Interval adjustedOverlapInterval = Intervals.translate( Intervals.translate( adjustedOverlaps.getA(), fixedTile.getBoundaries().min( 0 ), 0 ), fixedTile.getBoundaries().min( 1 ), 1 );
+					final Interval adjustedOverlapInterval = Intervals.translate( Intervals.translate( adjustedOverlaps.getA(), TileOperations.estimateBoundingBox( fixedTile ).min( 0 ), 0 ), TileOperations.estimateBoundingBox( fixedTile ).min( 1 ), 1 );
 					final int[][] fixedTileAdjustedOverlapCorners = new int[][] { Intervals.minAsIntArray( adjustedOverlapInterval ), Intervals.maxAsIntArray( adjustedOverlapInterval ) };
 					for ( int dFixed = 0; dFixed < 2; ++dFixed )
 					{
@@ -1371,7 +1371,7 @@ public class SearchRadiusEstimatorTest
 				// Draw adjusted overlap contour for the moving tile
 				{
 					final int movingTileContourColor = ARGBType.rgba( 0, 0x88, 0x88, 0xff );
-					final Interval adjustedOverlapInterval = Intervals.translate( Intervals.translate( adjustedOverlaps.getB(), movingTile.getBoundaries().min( 0 ), 0 ), movingTile.getBoundaries().min( 1 ), 1 );
+					final Interval adjustedOverlapInterval = Intervals.translate( Intervals.translate( adjustedOverlaps.getB(), TileOperations.estimateBoundingBox( movingTile ).min( 0 ), 0 ), TileOperations.estimateBoundingBox( movingTile ).min( 1 ), 1 );
 					final int[][] movingTileAdjustedOverlapCorners = new int[][] { Intervals.minAsIntArray( adjustedOverlapInterval ), Intervals.maxAsIntArray( adjustedOverlapInterval ) };
 					for ( int dFixed = 0; dFixed < 2; ++dFixed )
 					{
@@ -1664,7 +1664,7 @@ public class SearchRadiusEstimatorTest
 
 
 				final int[] displaySize = new int[] { 800, 1300, 800 };
-				final int[] displayOffset = Intervals.minAsIntArray( fixedTile.getBoundaries() );
+				final int[] displayOffset = Intervals.minAsIntArray( TileOperations.estimateBoundingBox( fixedTile ) );
 				displayOffset[ 0 ] -= displaySize[ 0 ] / 2;
 				displayOffset[ 1 ] -= displaySize[ 1 ] / 2;
 				displayOffset[ 2 ] -= displaySize[ 2 ] / 6;
@@ -1676,7 +1676,7 @@ public class SearchRadiusEstimatorTest
 				// Draw fixed tile contour
 				{
 					final int fixedTileContourColor = ARGBType.rgba( 0x22, 0x22, 0, 0xff );
-					final int[][] fixedTileContourCorners = new int[][] { Intervals.minAsIntArray( fixedTile.getBoundaries() ), Intervals.maxAsIntArray( fixedTile.getBoundaries() ) };
+					final int[][] fixedTileContourCorners = new int[][] { Intervals.minAsIntArray( TileOperations.estimateBoundingBox( fixedTile ) ), Intervals.maxAsIntArray( TileOperations.estimateBoundingBox( fixedTile ) ) };
 					for ( int dFixed1 = 0; dFixed1 < fixedTileContourCorners[ 0 ].length; ++dFixed1 )
 					{
 						for ( int dFixed2 = dFixed1 + 1; dFixed2 < fixedTileContourCorners[ 0 ].length; ++dFixed2 )
@@ -1709,7 +1709,7 @@ public class SearchRadiusEstimatorTest
 				// Draw moving tile contour
 				{
 					final int movingTileContourColor = ARGBType.rgba( 0, 0x22, 0x22, 0xff );
-					final int[][] movingTileContourCorners = new int[][] { Intervals.minAsIntArray( movingTile.getBoundaries() ), Intervals.maxAsIntArray( movingTile.getBoundaries() ) };
+					final int[][] movingTileContourCorners = new int[][] { Intervals.minAsIntArray( TileOperations.estimateBoundingBox( movingTile ) ), Intervals.maxAsIntArray( TileOperations.estimateBoundingBox( movingTile ) ) };
 					for ( int dFixed1 = 0; dFixed1 < movingTileContourCorners[ 0 ].length; ++dFixed1 )
 					{
 						for ( int dFixed2 = dFixed1 + 1; dFixed2 < movingTileContourCorners[ 0 ].length; ++dFixed2 )
@@ -1742,7 +1742,7 @@ public class SearchRadiusEstimatorTest
 				{
 					final int fixedTileColor = ARGBType.rgba( 0xff, 0xff, 0, 0xff );
 					for ( int d = 0; d < fixedTile.numDimensions(); ++d )
-						displayPosition[ d ] = ( int ) fixedTile.getBoundaries().min( d ) - displayOffset[ d ];
+						displayPosition[ d ] = ( int ) TileOperations.estimateBoundingBox( fixedTile ).min( d ) - displayOffset[ d ];
 					imgRandomAccess.setPosition( displayPosition );
 					imgRandomAccess.get().set( fixedTileColor );
 					imgRandomAccess.setPosition( new int[] { displayPosition[ 0 ] - 1, displayPosition[ 1 ], displayPosition[ 2 ] } );
@@ -1763,7 +1763,7 @@ public class SearchRadiusEstimatorTest
 				{
 					final int movingTileColor = ARGBType.rgba( 0, 0xff, 0xff, 0xff );
 					for ( int d = 0; d < movingTile.numDimensions(); ++d )
-						displayPosition[ d ] = ( int ) movingTile.getBoundaries().min( d ) - displayOffset[ d ];
+						displayPosition[ d ] = ( int ) TileOperations.estimateBoundingBox( movingTile ).min( d ) - displayOffset[ d ];
 					imgRandomAccess.setPosition( displayPosition );
 					imgRandomAccess.get().set( movingTileColor );
 					imgRandomAccess.setPosition( new int[] { displayPosition[ 0 ] - 1, displayPosition[ 1 ], displayPosition[ 2 ] } );

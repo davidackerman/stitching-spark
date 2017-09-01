@@ -58,15 +58,15 @@ public class TileSearchRadiusEstimator implements Serializable
 
 
 		// print stage bounding box
-		final Boundaries stageBoundingBox = TileOperations.getCollectionBoundaries( stageTiles );
-		System.out.println( "Stage bounding box: min=" + Arrays.toString( Intervals.minAsIntArray( stageBoundingBox ) ) + ", max=" + Arrays.toString( Intervals.maxAsIntArray( stageBoundingBox ) ) );
+		final Interval stageBoundingBox = TileOperations.getCollectionBoundaries( stageTiles );
+		System.out.println( "Stage bounding box: min=" + Arrays.toString( Intervals.minAsLongArray( stageBoundingBox ) ) + ", max=" + Arrays.toString( Intervals.maxAsLongArray( stageBoundingBox ) ) );
 
 		// print stage subset bounding box (only tiles that are contained in the stitched solution)
 		final List< TileInfo > stageTilesSubset = new ArrayList<>();
 		for ( final TileInfo stitchedTile : stitchedTiles )
 			stageTilesSubset.add( stageTilesMap.get( stitchedTile.getIndex() ) );
-		final Boundaries stageSubsetBoundingBox = TileOperations.getCollectionBoundaries( stageTilesSubset.toArray( new TileInfo[ 0 ] ) );
-		System.out.println( "Stage subset bounding box: min=" + Arrays.toString( Intervals.minAsIntArray( stageSubsetBoundingBox ) ) + ", max=" + Arrays.toString( Intervals.maxAsIntArray( stageSubsetBoundingBox ) ) );
+		final Interval stageSubsetBoundingBox = TileOperations.getCollectionBoundaries( stageTilesSubset.toArray( new TileInfo[ 0 ] ) );
+		System.out.println( "Stage subset bounding box: min=" + Arrays.toString( Intervals.minAsLongArray( stageSubsetBoundingBox ) ) + ", max=" + Arrays.toString( Intervals.maxAsLongArray( stageSubsetBoundingBox ) ) );
 	}
 
 

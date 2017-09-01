@@ -136,15 +136,6 @@ public class TileInfo implements Cloneable, Serializable, RealInterval {
 		return position.length;
 	}
 
-	public Boundaries getBoundaries() {
-		final Boundaries b = new Boundaries( numDimensions() );
-		for ( int d = 0; d < numDimensions(); d++ ) {
-			b.setMin( d, Math.round( getPosition(d) ) );
-			b.setMax( d, Math.round( getPosition(d) ) + getSize(d) - 1 );
-		}
-		return b;
-	}
-
 	@Override
 	public TileInfo clone() {
 		final TileInfo newTile = new TileInfo();
