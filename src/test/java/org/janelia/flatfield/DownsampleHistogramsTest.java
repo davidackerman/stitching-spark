@@ -2,32 +2,42 @@ package org.janelia.flatfield;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.janelia.dataaccess.DataProvider;
 import org.janelia.dataaccess.DataProviderFactory;
+import org.janelia.dataaccess.PathResolver;
 import org.janelia.histogram.Histogram;
-import org.janelia.saalfeldlab.n5.DataType;
 import org.janelia.saalfeldlab.n5.DatasetAttributes;
 import org.janelia.saalfeldlab.n5.GzipCompression;
 import org.janelia.saalfeldlab.n5.N5Writer;
+import org.janelia.saalfeldlab.n5.imglib2.list.N5SerializableUtils;
+import org.janelia.saalfeldlab.n5.spark.N5DownsamplingSpark;
+import org.janelia.saalfeldlab.n5.spark.N5WriterSupplier;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import net.imglib2.Cursor;
 import net.imglib2.FinalInterval;
 import net.imglib2.Interval;
 import net.imglib2.RandomAccess;
+import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.SerializableFinalInterval;
 import net.imglib2.img.cell.CellGrid;
-import net.imglib2.img.list.ListCursor;
+import net.imglib2.img.list.ListImg;
 import net.imglib2.img.list.WrappedListImg;
 import net.imglib2.iterator.IntervalIterator;
 import net.imglib2.realtransform.AffineTransform3D;
 import net.imglib2.util.IntervalIndexer;
 import net.imglib2.util.Intervals;
+import net.imglib2.util.Pair;
 import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 
@@ -36,6 +46,8 @@ public class DownsampleHistogramsTest
 	private static final String histogramsN5BasePath = System.getProperty("user.home") + "/tmp/n5-downsample-histogram-test";
 	private static final String histogramsDataset = "/test/group/dataset";
 	private static final double EPSILON = 1e-10;
+
+	private static final N5WriterSupplier n5Supplier = () -> DataProviderFactory.createFSDataProvider().createN5Writer( URI.create( histogramsN5BasePath ) );
 
 	private transient JavaSparkContext sparkContext;
 
@@ -57,14 +69,87 @@ public class DownsampleHistogramsTest
 	public void tearDown() throws IOException
 	{
 		sparkContext.close();
-
-		final DataProvider dataProvider = DataProviderFactory.createFSDataProvider();
-		final N5Writer n5 = dataProvider.createN5Writer( URI.create( histogramsN5BasePath ) );
-		n5.remove();
+		Assert.assertTrue( n5Supplier.get().remove() );
 	}
 
 	@Test
-	public void test() throws IOException
+	public void testRegularDownsampling() throws IOException
+	{
+		final Histogram[] histograms = new Histogram[ ( int ) Intervals.numElements( dimensions ) ];
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 0, 0, 0 }, dimensions ) ] = createHistogram( 5, 0, 1 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 1, 0, 0 }, dimensions ) ] = createHistogram( 3, 2, 1 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 2, 0, 0 }, dimensions ) ] = createHistogram( 2, 4, 0 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 3, 0, 0 }, dimensions ) ] = createHistogram( 5, 1, 0 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 0, 1, 0 }, dimensions ) ] = createHistogram( 2, 2, 2 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 1, 1, 0 }, dimensions ) ] = createHistogram( 3, 1, 2 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 2, 1, 0 }, dimensions ) ] = createHistogram( 1, 4, 1 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 3, 1, 0 }, dimensions ) ] = createHistogram( 1, 1, 4 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 0, 2, 0 }, dimensions ) ] = createHistogram( 0, 3, 3 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 1, 2, 0 }, dimensions ) ] = createHistogram( 1, 0, 5 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 2, 2, 0 }, dimensions ) ] = createHistogram( 0, 6, 0 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 3, 2, 0 }, dimensions ) ] = createHistogram( 3, 1, 2 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 0, 0, 1 }, dimensions ) ] = createHistogram( 0, 2, 4 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 1, 0, 1 }, dimensions ) ] = createHistogram( 4, 1, 1 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 2, 0, 1 }, dimensions ) ] = createHistogram( 0, 0, 6 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 3, 0, 1 }, dimensions ) ] = createHistogram( 0, 4, 2 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 0, 1, 1 }, dimensions ) ] = createHistogram( 1, 2, 3 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 1, 1, 1 }, dimensions ) ] = createHistogram( 3, 1, 2 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 2, 1, 1 }, dimensions ) ] = createHistogram( 4, 2, 0 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 3, 1, 1 }, dimensions ) ] = createHistogram( 1, 3, 2 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 0, 2, 1 }, dimensions ) ] = createHistogram( 0, 5, 1 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 1, 2, 1 }, dimensions ) ] = createHistogram( 1, 5, 0 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 2, 2, 1 }, dimensions ) ] = createHistogram( 4, 2, 0 );
+		histograms[ ( int ) IntervalIndexer.positionToIndex( new long[] { 3, 2, 1 }, dimensions ) ] = createHistogram( 6, 0, 0 );
+
+		// save histograms first
+		final RandomAccessibleInterval< Histogram > listImg = new ListImg<>( Arrays.asList( histograms ), dimensions );
+		N5SerializableUtils.save(
+				listImg,
+				n5Supplier.get(),
+				histogramsDataset,
+				blockSize,
+				new GzipCompression()
+			);
+
+		// validate
+		final RandomAccessibleInterval< Histogram > loadedImg = N5SerializableUtils.open( n5Supplier.get(), histogramsDataset );
+		for ( final Pair< Histogram, Histogram > pair : Views.flatIterable( Views.interval( Views.pair( listImg, loadedImg ), listImg ) ) )
+			Assert.assertTrue( pair.getA().valueEquals( pair.getB() ) );
+
+		final int[][] scales = N5DownsamplingSpark.downsample( sparkContext, n5Supplier, histogramsDataset );
+
+		Assert.assertEquals( 2, scales.length );
+		Assert.assertArrayEquals( new int[] { 1, 1, 1 }, scales[ 0 ] );
+		Assert.assertArrayEquals( new int[] { 2, 2, 2 }, scales[ 1 ] );
+
+		final String downsampledDataset = PathResolver.get( PathResolver.getParent( histogramsDataset ), "s1" );
+		final RandomAccessibleInterval< Histogram > downsampledImg = N5SerializableUtils.open( n5Supplier.get(), downsampledDataset );
+		Assert.assertArrayEquals( new long[] { 2, 1, 1 }, Intervals.dimensionsAsLongArray( downsampledImg ) );
+		final Cursor< Histogram > downsampledImgCursor = Views.iterable( downsampledImg ).cursor();
+
+		final List< Histogram > expectedDownsampledHistograms = new ArrayList<>();
+
+		final Histogram a = new Histogram( histMinValue, histMaxValue, bins );
+		a.put( a.getBinValue( 0 ), 5 + 3 + 2 + 3 + 0 + 4 + 1 + 3 );
+		a.put( a.getBinValue( 1 ), 0 + 2 + 2 + 1 + 2 + 1 + 2 + 1 );
+		a.put( a.getBinValue( 2 ), 1 + 1 + 2 + 2 + 4 + 1 + 3 + 2 );
+		a.average( 8 );
+		expectedDownsampledHistograms.add( a );
+
+		final Histogram b = new Histogram( histMinValue, histMaxValue, bins );
+		b.put( a.getBinValue( 0 ), 2 + 5 + 1 + 1 + 0 + 0 + 4 + 1 );
+		b.put( a.getBinValue( 1 ), 4 + 1 + 4 + 1 + 0 + 4 + 2 + 3 );
+		b.put( a.getBinValue( 2 ), 0 + 0 + 1 + 4 + 6 + 2 + 0 + 2 );
+		b.average( 8 );
+		expectedDownsampledHistograms.add( b );
+
+		final Iterator< Histogram > expectedDownsampledHistogramsIterator = expectedDownsampledHistograms.iterator();
+		Assert.assertTrue( expectedDownsampledHistogramsIterator.next().valueEquals( downsampledImgCursor.next() ) );
+		Assert.assertTrue( expectedDownsampledHistogramsIterator.next().valueEquals( downsampledImgCursor.next() ) );
+	}
+
+//	@Test
+	public void testShiftedDownsampling() throws IOException
 	{
 		final DataProvider dataProvider = DataProviderFactory.createFSDataProvider();
 
@@ -96,60 +181,7 @@ public class DownsampleHistogramsTest
 
 		// save histograms first
 		final N5Writer n5 = dataProvider.createN5Writer( URI.create( histogramsN5BasePath ) );
-		n5.createDataset(
-				histogramsDataset,
-				dimensions,
-				blockSize,
-				DataType.SERIALIZABLE,
-				new GzipCompression()
-			);
-		final CellGrid cellGrid = new CellGrid( dimensions, blockSize );
-		final long[] cellGridDimensions = cellGrid.getGridDimensions();
-		final long numCells = Intervals.numElements( cellGridDimensions );
-		final long[] cellMin = new long[ cellGrid.numDimensions() ], cellMax = new long[ cellGrid.numDimensions() ];
-		final int[] cellDimensions = new int[ cellGrid.numDimensions() ];
-		final long[] cellGridPosition = new long[ cellGrid.numDimensions() ], position = new long[ cellGrid.numDimensions() ];
-		for ( long cellIndex = 0; cellIndex < numCells; ++cellIndex )
-		{
-			cellGrid.getCellGridPositionFlat( cellIndex, cellGridPosition );
-			cellGrid.getCellDimensions( cellIndex, cellMin, cellDimensions );
-			for ( int d = 0; d < cellGrid.numDimensions(); ++d )
-				cellMax[ d ] = cellMin[ d ] + cellDimensions[ d ] - 1;
-			final Interval cellInterval = new FinalInterval( cellMin, cellMax );
-
-			final WrappedSerializableDataBlockWriter< Histogram > histogramsBlock = new WrappedSerializableDataBlockWriter<>(
-					n5,
-					histogramsDataset,
-					cellGridPosition
-				);
-
-			Assert.assertFalse( histogramsBlock.wasLoadedSuccessfully() );
-
-			final WrappedListImg< Histogram > histogramsBlockImg = histogramsBlock.wrap();
-
-			// initialize all histograms
-			final ListCursor< Histogram > histogramsBlockImgCursor = histogramsBlockImg.cursor();
-			while ( histogramsBlockImgCursor.hasNext() )
-			{
-				histogramsBlockImgCursor.fwd();
-				histogramsBlockImgCursor.set( new Histogram( histMinValue, histMaxValue, bins ) );
-			}
-
-			final IntervalView< Histogram > translatedHistogramsBlockImg = Views.translate( histogramsBlockImg, cellMin );
-			final RandomAccess< Histogram > translatedHistogramsBlockImgRandomAccess = translatedHistogramsBlockImg.randomAccess();
-
-			final IntervalIterator cellIntervalIterator = new IntervalIterator( cellInterval );
-			while ( cellIntervalIterator.hasNext() )
-			{
-				cellIntervalIterator.fwd();
-				cellIntervalIterator.localize( position );
-				translatedHistogramsBlockImgRandomAccess.setPosition( position );
-				final long pixelIndex = IntervalIndexer.positionToIndex( position, dimensions );
-				translatedHistogramsBlockImgRandomAccess.get().add( histograms[ ( int ) pixelIndex ] );
-			}
-
-			histogramsBlock.save();
-		}
+		N5SerializableUtils.save( new ListImg<>( Arrays.asList( histograms ), dimensions ), n5, histogramsDataset, blockSize, new GzipCompression() );
 
 		final Interval interval = new SerializableFinalInterval( dimensions );
 		final ShiftedDownsampling< AffineTransform3D > shiftedDownsampling = new ShiftedDownsampling<>( sparkContext, interval );
