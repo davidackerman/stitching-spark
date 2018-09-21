@@ -22,8 +22,9 @@ import net.imglib2.converter.Converters;
 import net.imglib2.converter.RealFloatConverter;
 import net.imglib2.exception.ImgLibException;
 import net.imglib2.exception.IncompatibleTypeException;
-import net.imglib2.img.imageplus.FloatImagePlus;
+import net.imglib2.img.array.ArrayImgs;
 import net.imglib2.img.imageplus.ImagePlusImg;
+import net.imglib2.img.imageplus.ImagePlusImgFactory;
 import net.imglib2.img.imageplus.ImagePlusImgs;
 import net.imglib2.realtransform.AffineGet;
 import net.imglib2.realtransform.InvertibleRealTransform;
@@ -34,6 +35,7 @@ import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.util.Intervals;
 import net.imglib2.util.IntervalsHelper;
 import net.imglib2.util.Pair;
+import net.imglib2.util.Util;
 import net.imglib2.util.ValuePair;
 import net.imglib2.view.RandomAccessiblePairNullable;
 import net.imglib2.view.Views;
@@ -198,8 +200,9 @@ public class StitchSubTilePair< T extends NativeType< T > & RealType< T >, U ext
 
 		System.out.println( "Averaging corresponding tile images for " + job.getChannels() + " channels" );
 
-		FloatImagePlus< FloatType > avgChannelImg = null;
+		RandomAccessibleInterval< FloatType > avgChannelImg = null;
 		Interval roiBoundingBox = null;
+		T inputType = null;
 		int channelsUsed = 0;
 
 		for ( int channel = 0; channel < job.getChannels(); ++channel )
@@ -229,7 +232,7 @@ public class StitchSubTilePair< T extends NativeType< T > & RealType< T >, U ext
 
 			// allocate output image if needed
 			if ( avgChannelImg == null )
-				avgChannelImg = ImagePlusImgs.floats( Intervals.dimensionsAsLongArray( roiImg ) );
+				avgChannelImg = ArrayImgs.floats( Intervals.dimensionsAsLongArray( roiImg ) );
 			else if ( !Intervals.equalDimensions( avgChannelImg, roiImg ) )
 				throw new PipelineExecutionException( "different ROI dimensions for the same grid position " + Utils.getTileCoordinatesString( tile ) );
 
@@ -238,6 +241,10 @@ public class StitchSubTilePair< T extends NativeType< T > & RealType< T >, U ext
 				roiBoundingBox = new FinalInterval( roiImg );
 			else if ( !Intervals.equals( roiBoundingBox, roiImg ) )
 				throw new PipelineExecutionException( "different ROI coordinates for the same grid position " + Utils.getTileCoordinatesString( tile ) );
+
+			// store input type
+			if ( inputType == null )
+				inputType = Util.getTypeFromInterval( roiImg ).createVariable();
 
 			// accumulate data in the output image
 			final RandomAccessibleInterval< FloatType > srcImg = Converters.convert( roiImg, new RealFloatConverter<>(), new FloatType() );
@@ -269,19 +276,26 @@ public class StitchSubTilePair< T extends NativeType< T > & RealType< T >, U ext
 			throw new PipelineExecutionException( e );
 		}
 
-		final ImagePlus roiImp;
+		// convert back to input data type
+		final ImagePlusImg< T, ? > finalImg = new ImagePlusImgFactory< T >().create( avgChannelImg, inputType );
+		final Cursor< FloatType > avgChannelImgCursor = Views.flatIterable( avgChannelImg ).cursor();
+		final Cursor< T > finalImgCursor = Views.flatIterable( finalImg ).cursor();
+		while ( finalImgCursor.hasNext() || avgChannelImgCursor.hasNext() )
+			finalImgCursor.next().setReal( avgChannelImgCursor.next().get() );
+
+		final ImagePlus finalImp;
 		try
 		{
-			roiImp = avgChannelImg.getImagePlus();
+			finalImp = finalImg.getImagePlus();
 		}
 		catch ( final ImgLibException e )
 		{
 			throw new PipelineExecutionException( e );
 		}
 
-		Utils.workaroundImagePlusNSlices( roiImp );
+		Utils.workaroundImagePlusNSlices( finalImp );
 
-		return new ValuePair<>( roiImp, roiBoundingBox );
+		return new ValuePair<>( finalImp, roiBoundingBox );
 	}
 
 	private < F extends NumericType< F > > void blur( final RandomAccessibleInterval< F > image, final double[] sigmas ) throws IncompatibleTypeException
@@ -291,21 +305,21 @@ public class StitchSubTilePair< T extends NativeType< T > & RealType< T >, U ext
 	}
 
 	// TODO: compute variance only within new overlapping region (after matching)
-	static double computeVariance( final ImagePlus[] roiPartImps )
+	static < T extends NativeType< T > & RealType< T > > double computeVariance( final ImagePlus[] roiPartImps )
 	{
 		double pixelSum = 0, pixelSumSquares = 0;
 		long pixelCount = 0;
 		for ( int i = 0; i < 2; ++i )
 		{
-			final ImagePlusImg< FloatType, ? > roiImg = ImagePlusImgs.from( roiPartImps[ i ] );
-			final Cursor< FloatType > roiImgCursor = Views.iterable( roiImg ).cursor();
+			final RandomAccessibleInterval< T > roiImg = ImagePlusImgs.from( roiPartImps[ i ] );
+			final Cursor< T > roiImgCursor = Views.iterable( roiImg ).cursor();
 			while ( roiImgCursor.hasNext() )
 			{
-				final double val = roiImgCursor.next().get();
+				final double val = roiImgCursor.next().getRealDouble();
 				pixelSum += val;
 				pixelSumSquares += Math.pow( val, 2 );
 			}
-			pixelCount += roiImg.size();
+			pixelCount += Intervals.numElements( roiImg );
 		}
 		final double variance = pixelSumSquares / pixelCount - Math.pow( pixelSum / pixelCount, 2 );
 		return variance;
